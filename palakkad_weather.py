@@ -17,7 +17,11 @@ weather_data = {}
 
 @app.get("/weather/{area}")
 def get_weather(area: str):
-    return weather_data[area]
+    if area in weather_data:
+        return weather_data[area]
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Weather not found for {area}")
 
 @app.get("/weather/")
 def get_weather_dump():
@@ -25,11 +29,15 @@ def get_weather_dump():
 
 @app.post("/weather")
 def post_weather(data: AddWeatherData):
-    weather_data[data.area] = {
-        "temp": data.temp,
-        "unit": data.unit
-    }
-    return {"message": f"Weather {data.area} added."}
+    if data.area not in weather_data:
+        weather_data[data.area] = {
+            "temp": data.temp,
+            "unit": data.unit
+        }
+        return {"message": f"Weather {data.area} added."}
+    else:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Weather for {data.area} already exists.")
 
 @app.delete("/weather/{area}")
 def delete_weather(area: str):
@@ -39,20 +47,19 @@ def delete_weather(area: str):
     else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Weather not found for {area}")
-
 @app.put("/weather/{area}")
-def put_weather(area: str, data: AddWeatherData):
-    if area in weather_data:
-        weather_data[area] = {
-            "temp": data.temp,
-            "unit": data.unit
-        }
+def put_weather(area: str, data: UpdateWeatherData):
+    if area not in weather_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Weather not found for {area}"
+        )
 
-        return {
-            "message": f"Weather for {area} updated successfully."
-        }
+    weather_data[area] = {
+        "temp": data.temp,
+        "unit": data.unit
+    }
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Weather not found for {area}"
-    )
+    return {
+        "message": f"Weather for {area} updated successfully."
+    }
