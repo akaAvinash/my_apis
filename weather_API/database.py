@@ -1,5 +1,9 @@
 from sqlalchemy import table
 from sqlmodel import SQLModel, Field, create_engine, Session
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class WeatherData(SQLModel, table=True):
     area: str = Field(primary_key=True)
@@ -10,10 +14,8 @@ class User(SQLModel, table=True):
     username: str = Field(primary_key=True)
     hashed_password: str
 
-sqlite_filename = "weather.db"
-sqlite_url = f"sqlite:///{sqlite_filename}"
-
-engine = create_engine(sqlite_url, echo=True)
+DATABASE_URL = os.environ["DATABASE_URL"]
+engine = create_engine(DATABASE_URL, echo=True)
 
 def get_session():
     with Session(engine) as session:
