@@ -34,3 +34,5 @@ htmlcov/
 # Generated docs / reports
 TESTING.md
 *.pdf
+
+.env

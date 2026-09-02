@@ -3,8 +3,9 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 from starlette import status
 from database import engine, get_session, WeatherData, User
-from auth import hash_password
+from auth import hash_password, verify_password, create_access_token, get_current_user
 from sqlmodel import Session, select
+from fastapi.security import OAuth2PasswordRequestForm
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,10 +28,9 @@ class RegisterUser(BaseModel):
     username: str = Field(min_length=1)
     password: str = Field(min_length=1)
 
-weather_data = {}
-
 @app.get("/weather/{area}")
-def get_weather(area: str, session: Session = Depends(get_session)):
+def get_weather(area: str, session: Session = Depends(get_session),
+                 current_user: User = Depends(get_current_user)):
     weather = session.get(WeatherData, area)
     if weather:
         return weather
@@ -39,12 +39,14 @@ def get_weather(area: str, session: Session = Depends(get_session)):
                             detail=f"Weather not found for {area}")
 
 @app.get("/weather/")
-def get_weather_dump(session: Session = Depends(get_session)):
+def get_weather_dump(session: Session = Depends(get_session),
+                      current_user: User = Depends(get_current_user)):
     weather = session.exec(select(WeatherData)).all()
     return weather
 
 @app.post("/weather")
-def post_weather(data: AddWeatherData, session: Session = Depends(get_session)):
+def post_weather(data: AddWeatherData, session: Session = Depends(get_session),
+                  current_user: User = Depends(get_current_user)):
     existing = session.get(WeatherData, data.area)
     if existing:
         raise HTTPException(
@@ -58,7 +60,8 @@ def post_weather(data: AddWeatherData, session: Session = Depends(get_session)):
     return {"message": f"Weather {data.area} added."}
 
 @app.delete("/weather/{area}")
-def delete_weather(area: str, session: Session = Depends(get_session)):
+def delete_weather(area: str, session: Session = Depends(get_session),
+                    current_user: User = Depends(get_current_user)):
     weather = session.get(WeatherData, area)
     if weather:
         session.delete(weather)
@@ -69,7 +72,8 @@ def delete_weather(area: str, session: Session = Depends(get_session)):
                             detail=f"Weather not found for {area}")
 
 @app.put("/weather/{area}")
-def put_weather(area: str, data: UpdateWeatherData, session: Session = Depends(get_session)):
+def put_weather(area: str, data: UpdateWeatherData, session: Session = Depends(get_session),
+                 current_user: User = Depends(get_current_user)):
     weather = session.get(WeatherData, area)
     if not weather:
         raise HTTPException(
@@ -101,3 +105,16 @@ def register_user(data: RegisterUser, session: Session = Depends(get_session)):
     session.refresh(user)
 
     return {"message": f"User {data.username} registered successfully."}
+
+@app.post("/token")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    user = session.get(User, form_data.username)
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token({"sub": user.username})
+    return {"access_token": token, "token_type": "bearer"}
