@@ -7,7 +7,7 @@ class WeatherData(SQLModel, table=True):
     unit: str
 
 class User(SQLModel, table=True):
-    user: str = Field(primary_key=True)
+    username: str = Field(primary_key=True)
     hashed_password: str
 
 sqlite_filename = "weather.db"

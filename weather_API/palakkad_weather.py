@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 from starlette import status
-from database import engine, get_session, WeatherData
+from database import engine, get_session, WeatherData, User
+from auth import hash_password
 from sqlmodel import Session, select
 
 @asynccontextmanager
@@ -21,6 +22,10 @@ class AddWeatherData(BaseModel):
 class UpdateWeatherData(BaseModel):
     temp: float
     unit: str
+
+class RegisterUser(BaseModel):
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
 
 weather_data = {}
 
@@ -82,3 +87,17 @@ def put_weather(area: str, data: UpdateWeatherData, session: Session = Depends(g
     return {
         "message": f"Weather for {area} updated successfully."
     }
+
+@app.post("/register")
+def register_user(data: RegisterUser, session: Session = Depends(get_session)):
+    existing = session.get(User, data.username)
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"User {data.username} already exists.")
+
+    user = User(username=data.username, hashed_password=hash_password(data.password))
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    return {"message": f"User {data.username} registered successfully."}
